@@ -412,11 +412,11 @@ chmod -R 755 /opt/*
 ```
 
 ---
+## Application Source  
 
-## 15. Resume Description (Use This)
+This project uses a cab booking application forked from an open-source repository.
 
-Built and deployed a CI/CD pipeline using Jenkins, Maven, and Apache Tomcat on AWS EC2. Automated build and deployment process by integrating GitHub with Jenkins, enabling continuous delivery of Java applications.
-
+Original Repo: https://github.com/CloudNinjaa/cab-booking.git
 ---
 
 ## 16. Conclusion
