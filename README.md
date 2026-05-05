@@ -1,432 +1,181 @@
-# End-to-End CI/CD Pipeline for Cab Booking Application using Jenkins, Maven, and Tomcat on AWS
-
-## 1. Overview
-
-This document provides a complete, real-world setup of a CI/CD pipeline using:
-
-* **Maven** → Build tool
-* **Jenkins** → Automation server
-* **Tomcat** → Application deployment server
-* **AWS EC2** → Infrastructure
-
-This setup is commonly used in DevOps environments for automating build and deployment of Java applications.
+# CI/CD Pipeline Implementation using Jenkins, Docker, Ansible and AWS
 
 ---
 
-## 2. Architecture Flow
+## 1. Project Overview
 
-Developer → GitHub → Jenkins → Maven Build → WAR File → Tomcat Deployment
+This project implements an end-to-end CI/CD pipeline to automate the process of building, testing, analyzing, containerizing, and deploying a web application.
 
----
-
-## 3. AWS EC2 Instance Creation (Maven + Jenkins Server)
-
-1. Created an EC2 instance named **Maven Server**
-2. OS: Amazon Linux / RHEL-based
-3. Connected using:
-
-   * AWS SSH OR
-   * MobaXterm
-
-Switch to root:
-
-```bash
-sudo su -
-```
+The pipeline is automatically triggered when code is pushed to the GitHub repository and completes deployment on an AWS EC2 instance.
 
 ---
 
-## 4. Apache Maven Installation
+## 2. Pipeline Workflow
 
-### 4.1 Download
-
-```bash
-cd /opt
-wget https://dlcdn.apache.org/maven/maven-3/3.9.15/binaries/apache-maven-3.9.15-bin.tar.gz
-```
-
-### 4.2 Extract & Setup
-
-```bash
-tar -xvf apache-maven-3.9.15-bin.tar.gz
-mv apache-maven-3.9.15 maven
-```
+GitHub → Jenkins → Maven Build + JUnit Test → SonarQube → Docker → Trivy → DockerHub → Ansible → AWS EC2
 
 ---
 
-## 5. Java Installation (Prerequisite)
+## 3. System Setup
 
-### Check available versions:
+### 3.1 Control Node (Jenkins Server)
 
-```bash
-yum list java*
-```
+The following tools are installed on the Jenkins server:
 
-### Install Java 21:
-
-```bash
-yum install java-21-openjdk-headless -y
-```
+- Jenkins (Pipeline execution)
+- Docker (Image creation)
+- Maven (Build tool)
+- Trivy (Security scanning)
+- Ansible (Deployment automation)
 
 ---
 
-## 6. Environment Variables Configuration
+### 3.2 Target Node (AWS EC2)
 
-Edit:
-
-```bash
-vi ~/.bash_profile
-```
-
-Add:
-
-```bash
-JAVA_HOME=/usr/lib/jvm/java-21
-M2_HOME=/opt/maven
-M2=/opt/maven/bin
-PATH=$PATH:$HOME/bin:$JAVA_HOME:$M2_HOME:$M2
-```
-
-Apply changes:
-
-```bash
-source ~/.bash_profile
-```
-
-### Verify:
-
-```bash
-echo $JAVA_HOME
-mvn -version
-```
+- Docker installed
+- Application deployed as container
 
 ---
 
-## 7. Jenkins Installation
+## 4. Jenkins Pipeline Configuration
 
-### 7.1 Add Repository
-
-```bash
-wget -O /etc/yum.repos.d/jenkins.repo \
-https://pkg.jenkins.io/rpm-stable/jenkins.repo
-```
-
-```bash
-rpm --import https://pkg.jenkins.io/rpm-stable/jenkins.io-2023.key
-```
-
-### 7.2 Install Jenkins
-
-```bash
-yum install jenkins -y
-```
-
-### 7.3 Start Service
-
-```bash
-systemctl start jenkins
-systemctl enable jenkins
-systemctl status jenkins
-```
+- A Pipeline job is created in Jenkins  
+- Connected to GitHub using **Pipeline Script from SCM**  
+- Trigger configured using **Poll SCM**  
+- Pipeline logic defined in `Jenkinsfile`  
 
 ---
 
-## 8. Jenkins Web Access
+## 5. Pipeline Execution Stages
 
-Open:
-
-```
-http://<EC2-Public-IP>:8080
-```
-
-Get password:
-
-```bash
-cat /var/lib/jenkins/secrets/initialAdminPassword
-```
-
-### Setup:
-
-* Install Suggested Plugins
-* Create Admin User
+All the following stages are executed automatically by Jenkins.
 
 ---
 
-## 9. Jenkins Configuration (Important)
+### 5.1 Source Code Integration
 
-### 9.1 Install Plugins
-
-* Maven Integration Plugin
-* Git Plugin
-* Pipeline Plugin
-* Deploy to Container Plugin
-
-### 9.2 Configure Tools
-
-Manage Jenkins → Global Tool Configuration:
-
-* JDK (Java 21)
-* Git
-* Maven (/opt/maven)
+- Developer pushes code to GitHub  
+- Jenkins detects changes and triggers pipeline  
 
 ---
 
-## 10. Jenkins Job Creation
+### 5.2 Build and Unit Testing
 
-### Step 1: Create Job
+**Command executed:**
+  mvn clean package
 
-* New Item → Freestyle Project
-
-### Step 2: Source Code
-
-* Add GitHub repository URL (Cab Booking App - Forked Repo)
-* Branch:
-
-```
-*/main
-```
-
-### Step 3: Build Triggers (Optional)
-
-* Poll SCM
-* GitHub webhook
-
-### Step 4: Build Step (Very Important)
-
-```bash
-mvn clean package
-```
-
-### Output Generated:
-
-```
-target/*.war
-```
+**Explanation:**
+- Compiles the application  
+- Resolves dependencies  
+- Executes JUnit test cases  
+- Stops pipeline if tests fail  
 
 ---
 
-## 11. Deployment to Tomcat (CI/CD Integration)
+### 5.3 Code Quality Analysis
 
-### Using "Deploy to Container" Plugin
+**Command executed:**
+mvn sonar:sonar
 
-Configure in **Post-Build Actions**:
-
-* WAR/EAR Files:
-
-```
-target/*.war
-```
-
-* Context Path:
-
-```
-/cab-app
-```
-
-* Tomcat URL:
-
-```
-http://<tomcat-ip>:8080
-```
+**Explanation:**
+- Analyzes code using SonarQube  
+- Detects bugs and vulnerabilities  
+- Ensures code quality  
 
 ---
 
-## 12. Final Output
+### 5.4 Docker Image Creation (Automated)
 
-After successful build and deployment:
+**Command executed:**
+docker build -t <dockerhub-username>/app .
 
-Access the application in browser:
-
-```
-http://<tomcat-ip>:8080/cab-app
-```
-
-✅ Cab Booking Application is successfully deployed and live
+**Explanation:**
+- Builds Docker image using Dockerfile  
+- Packages application with dependencies  
 
 ---
 
-## 13. Apache Tomcat Installation (Deployment Server)
+### 5.5 Security Scanning (Trivy)
 
-Apache Tomcat Installation (Deployment Server)
+**Command executed:**
+trivy image <dockerhub-username>/app
 
-### 11.1 EC2 Setup (Tomcat Server)
-
-1. Created a separate EC2 instance named **Tomcat Server**
-2. Connected using SSH / MobaXterm
-3. Switch to root:
-
-```bash
-sudo su -
-```
+**Explanation:**
+- Scans image for vulnerabilities  
+- Ensures secure deployment  
 
 ---
 
-### 11.2 Install Java (Prerequisite)
+### 5.6 Push Image to DockerHub
 
-```bash
-yum install java -y
-```
+**Commands executed:**
+docker login
+docker push <dockerhub-username>/app
 
-Verify:
-
-```bash
-java -version
-```
+**Explanation:**
+- Uploads image to DockerHub  
+- Makes image available for deployment  
 
 ---
 
-### 11.3 Download and Install Tomcat
+## 6. Deployment using Ansible
 
-Go to /opt directory:
-
-```bash
-cd /opt
-```
-
-Download Tomcat:
-
-```bash
-wget https://dlcdn.apache.org/tomcat/tomcat-10/v10.1.54/bin/apache-tomcat-10.1.54.tar.gz
-```
-
-Extract:
-
-```bash
-tar -xvzf apache-tomcat-10.1.54.tar.gz
-```
-
-Rename:
-
-```bash
-mv apache-tomcat-10.1.54 tomcat
-```
+Deployment is performed from the Jenkins server to AWS EC2.
 
 ---
 
-### 11.4 Start Tomcat Server
+### 6.1 Inventory Configuration
 
-```bash
-cd /opt/tomcat/bin
-sh startup.sh
-```
+File:ansible/inventory
 
-Access in browser:
-
-```
-http://<Public-IP>:8080
-```
+Add:<EC2-IP> ansible_user=ubuntu ansible_ssh_private_key_file=key.pem
 
 ---
 
-### 11.5 Enable Manager & Host Manager Access
+### 6.2 Run Playbook
 
-By default, Tomcat restricts access. Modify context.xml files:
-
-```bash
-vi /opt/tomcat/webapps/manager/META-INF/context.xml
-vi /opt/tomcat/webapps/host-manager/META-INF/context.xml
-```
-
-Remove or comment the RemoteAddrValve restriction.
+ansible-playbook -i ansible/inventory ansible/playbook.yml
 
 ---
 
-### 11.6 Create Tomcat User
+### 6.3 Deployment Actions
 
-Edit:
-
-```bash
-vi /opt/tomcat/conf/tomcat-users.xml
-```
-
-Add:
-
-```xml
-<role rolename="manager-gui"/>
-<user username="tomcat" password="tomcat" roles="manager-gui"/>
-```
+- Connects to EC2 instance  
+- Pulls Docker image from DockerHub  
+- Runs container  
 
 ---
 
-### 11.7 Restart Tomcat
+## 7. Application Access
 
-```bash
-cd /opt/tomcat/bin
-sh shutdown.sh
-sh startup.sh
-```
+After deployment:
+http://<EC2-PUBLIC-IP>
+
 
 ---
 
-### 11.8 Access Manager Application
+## 8. Screenshots (Proof of Implementation)
 
-Open:
-
-```
-http://<Public-IP>:8080/manager/html
-```
-
-Login using:
-
-* Username: tomcat
-* Password: tomcat
+- Jenkins pipeline execution  
+- SonarQube analysis dashboard  
+- Trivy vulnerability scan  
+- DockerHub repository  
+- Docker container running on EC2 (`docker ps`)  
+- Application running in browser  
 
 ---
 
-## 12. CI/CD Flow Explanation (Interview Ready)
+## 9. Result
 
-CI/CD Flow Explanation (Interview Ready)
-
-1. Developer pushes code to GitHub
-2. Jenkins pulls code automatically
-3. Maven builds the project and creates WAR file
-4. Jenkins deploys WAR to Tomcat
-5. Application becomes live
+- CI/CD pipeline executed successfully  
+- Build, testing, and deployment automated  
+- Application deployed on AWS EC2  
+- Application accessible via browser  
 
 ---
 
-## 13. Real-World Enhancements
+## 10. Conclusion
 
-* Use **separate EC2 instances** for Jenkins and Tomcat
-* Store credentials in Jenkins Credentials Manager
-* Use **Pipeline as Code (Jenkinsfile)**
-* Integrate with Docker & Kubernetes
-* Add SonarQube for code quality
+This project successfully demonstrates a complete CI/CD pipeline that automates the software delivery process. It reduces manual effort, improves reliability, and ensures consistent deployment.
 
 ---
-
-## 14. Common Errors & Fixes
-
-### Jenkins not opening
-
-* Check port 8080 in Security Group
-
-### Maven not working
-
-* Verify PATH and JAVA_HOME
-
-### Permission issues
-
-```bash
-chmod -R 755 /opt/*
-```
-
----
-## Application Source  
-
-This project uses a cab booking application forked from an open-source repository.
-
-Original Repo: https://github.com/CloudNinjaa/cab-booking.git
----
-
-## 16. Conclusion
-
-This project demonstrates practical DevOps skills including:
-
-* Server setup
-* Build automation
-* CI/CD pipeline creation
-* Deployment automation
-
----
-
